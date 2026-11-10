@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: ajaia-docs
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: SESSION_SECRET
+        generateValue: true

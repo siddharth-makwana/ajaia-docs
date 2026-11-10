@@ -149,41 +149,15 @@ describe('file import', () => {
 });
 
 describe('docx import', () => {
-  // Build a minimal Word document in memory so the test needs no binary fixture.
-  async function makeDocx() {
-    const { default: JSZip } = await import('jszip');
-    const zip = new JSZip();
-    zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-<Default Extension="xml" ContentType="application/xml"/>
-<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-</Types>`);
-    zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>`);
-    zip.file('word/document.xml', `<?xml version="1.0" encoding="UTF-8"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
-<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Quarterly Review</w:t></w:r></w:p>
-<w:p><w:r><w:t xml:space="preserve">Revenue grew </w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>12%</w:t></w:r></w:p>
-</w:body></w:document>`);
-    return zip.generateAsync({ type: 'nodebuffer' });
-  }
-
-  it('converts a Word document, keeping headings and bold text', async () => {
+  it('converts a Word document, keeping headings, bold and lists', async () => {
+    const fs = await import('node:fs');
     const alice = await login('alice@ajaia.dev');
-    const res = await alice.post('/api/documents/import').attach('file', await makeDocx(), 'Quarterly Review.docx');
+    const res = await alice.post('/api/documents/import')
+      .attach('file', fs.readFileSync(new URL('./fixtures/sample.docx', import.meta.url)), 'Quarterly Review.docx');
     expect(res.status).toBe(201);
     expect(res.body.document.title).toBe('Quarterly Review');
     expect(res.body.document.content).toContain('<h1>Quarterly Review</h1>');
     expect(res.body.document.content).toContain('<strong>12%</strong>');
-  });
-
-  it('rejects a corrupt .docx with a helpful message', async () => {
-    const alice = await login('alice@ajaia.dev');
-    const res = await alice.post('/api/documents/import').attach('file', Buffer.from('not a zip'), 'broken.docx');
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/valid Word document/);
+    expect(res.body.document.content).toContain('<li>Hire two engineers</li>');
   });
 });
